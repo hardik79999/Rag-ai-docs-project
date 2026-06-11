@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>RAG AI Docs</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+
+  <!-- GSAP (motion library) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter','system-ui','sans-serif'], mono: ['JetBrains Mono','monospace'] },
+          colors: {
+            b: { 400:'#60a5fa', 500:'#3b82f6', 600:'#2563eb' },
+            v: { 400:'#c084fc', 500:'#a855f7', 600:'#9333ea' },
+            g: { 400:'#34d399', 500:'#10b981' },
+          }
+        }
+      }
+    }
+  </script>
+
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root {
+  --bg:         #050810;
+  --surface:    rgba(255,255,255,0.035);
+  --border:     rgba(255,255,255,0.07);
+  --border-hi:  rgba(96,165,250,0.35);
+  --text:       #e2e8f0;
+  --muted:      #64748b;
+  --blue:       #3b82f6;
+  --purple:     #a855f7;
+  --green:      #10b981;
+}
+
+html,body { height:100%; overflow-x:hidden; }
+
+body {
+  background: var(--bg);
+  font-family: 'Inter', sans-serif;
+  color: var(--text);
+}
+
+/* ── Canvas ── */
+#bg-canvas { position:fixed; inset:0; z-index:0; pointer-events:none; }
+
+/* ── Layout ── */
+.app { position:relative; z-index:1; min-height:100vh; display:flex; flex-direction:column; }
+
+/* ── Glass ── */
+.glass {
+  background: var(--surface);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+.glass-sm { border-radius:10px; }
+
+/* ── Header ── */
+.header {
+  position: sticky; top:0; z-index:50;
+  background: rgba(5,8,16,0.8);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 28px;
+  display: flex; align-items:center; justify-content:space-between;
+}
+.logo-mark {
+  width:38px; height:38px; border-radius:10px;
+  background: linear-gradient(135deg,#3b82f6,#a855f7);
+  display:flex; align-items:center; justify-content:center;
+  font-size:18px; font-weight:700;
+  box-shadow: 0 0 20px rgba(59,130,246,0.4);
+}
+.logo-text { font-size:15px; font-weight:700; letter-spacing:-0.3px; }
+.logo-sub  { font-size:11px; color:var(--muted); margin-top:1px; }
+.grad { background:linear-gradient(135deg,#60a5fa,#c084fc,#34d399); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+
+/* ── Pill ── */
+.pill {
+  display:flex; align-items:center; gap:6px;
+  background: var(--surface); border:1px solid var(--border);
+  border-radius:999px; padding:5px 12px;
+  font-size:12px;
+}
+.dot { width:7px; height:7px; border-radius:50%; background:#fbbf24; }
+.dot.online { background:#34d399; box-shadow:0 0 8px #34d399; }
+.dot.offline { background:#f87171; box-shadow:0 0 8px #f87171; animation:pulse-dot 1.2s infinite; }
+@keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+/* ── Main grid ── */
+.main-grid {
+  flex:1;
+  display:grid;
+  grid-template-columns: 360px 1fr;
+  gap:20px;
+  padding:20px 28px 28px;
+  max-width:1400px;
+  margin:0 auto;
+  width:100%;
+}
+@media(max-width:900px){ .main-grid{ grid-template-columns:1fr; } }
+
+/* ── Cards ── */
+.card { padding:22px; }
+
+/* ── Drop zone ── */
+.dropzone {
+  border: 2px dashed rgba(96,165,250,0.25);
+  border-radius:12px;
+  padding:28px 20px;
+  text-align:center;
+  cursor:pointer;
+  transition: border-color .25s, background .25s, box-shadow .25s;
+  position:relative; overflow:hidden;
+}
+.dropzone:hover { border-color:rgba(96,165,250,0.55); background:rgba(59,130,246,0.04); }
+.dropzone.over  { border-color:#60a5fa; background:rgba(59,130,246,0.08); box-shadow:0 0 40px rgba(59,130,246,0.15) inset; }
+.dropzone-icon {
+  width:52px; height:52px; margin:0 auto 12px;
+  background:linear-gradient(135deg,rgba(59,130,246,0.2),rgba(168,85,247,0.2));
+  border:1px solid rgba(96,165,250,0.25);
+  border-radius:14px;
+  display:flex; align-items:center; justify-content:center;
+  transition: transform .3s cubic-bezier(.34,1.56,.64,1);
+}
+.dropzone:hover .dropzone-icon { transform:scale(1.1) translateY(-3px); }
+
+/* ── Btn primary ── */
+.btn-primary {
+  position:relative; overflow:hidden;
+  background:linear-gradient(135deg,#3b82f6,#9333ea);
+  border:none; border-radius:11px;
+  color:#fff; font-weight:600; font-size:13.5px;
+  padding:11px 20px;
+  cursor:pointer; width:100%;
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  transition: transform .2s, box-shadow .2s, opacity .2s;
+}
+.btn-primary::after {
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.18),transparent);
+  background-size:200% 100%;
+  animation:shimmer 2.5s linear infinite;
+}
+.btn-primary:hover:not(:disabled){ transform:translateY(-1px); box-shadow:0 8px 30px rgba(59,130,246,0.45); }
+.btn-primary:active:not(:disabled){ transform:scale(.97); }
+.btn-primary:disabled{ opacity:.4; cursor:not-allowed; }
+@keyframes shimmer{ 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+/* ── Progress ── */
+.progress-track { height:3px; background:rgba(255,255,255,0.07); border-radius:99px; overflow:hidden; }
+.progress-fill  { height:100%; border-radius:99px; background:linear-gradient(90deg,#3b82f6,#a855f7,#34d399); background-size:200% 100%; animation:shimmer 1.4s linear infinite; transition:width .45s ease; }
+
+/* ── File item ── */
+.file-item {
+  display:flex; align-items:center; gap:10px;
+  background:rgba(255,255,255,0.03); border:1px solid var(--border);
+  border-radius:10px; padding:9px 12px;
+  animation:slideUp .3s cubic-bezier(.16,1,.3,1);
+}
+.file-badge { width:28px; height:28px; border-radius:7px; background:rgba(239,68,68,0.18); display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; color:#fca5a5; flex-shrink:0; }
+
+/* ── Doc item ── */
+.doc-item {
+  display:flex; align-items:center; gap:10px;
+  border:1px solid var(--border); border-radius:10px; padding:9px 12px;
+  cursor:pointer; transition:all .2s ease;
+  animation:slideUp .35s cubic-bezier(.16,1,.3,1) both;
+}
+.doc-item:hover { background:rgba(255,255,255,0.05); border-color:rgba(96,165,250,0.3); transform:translateX(2px); }
+.doc-item.sel   { background:linear-gradient(135deg,rgba(59,130,246,0.18),rgba(168,85,247,0.12)); border-color:rgba(96,165,250,0.5); }
+.doc-check { width:18px; height:18px; border-radius:50%; border:1.5px solid rgba(255,255,255,0.2); display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:all .2s; }
+.doc-item.sel .doc-check { background:#3b82f6; border-color:#3b82f6; }
+
+/* ── Stat ── */
+.stat-val { font-size:26px; font-weight:700; line-height:1; }
+
+/* ── Chat ── */
+.chat-wrap { display:flex; flex-direction:column; min-height:600px; }
+.chat-header { padding:16px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+.ai-avatar { width:34px; height:34px; border-radius:10px; background:linear-gradient(135deg,#3b82f6,#9333ea); display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:15px; box-shadow:0 0 16px rgba(59,130,246,0.35); }
+
+.messages { flex:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:16px; }
+.messages::-webkit-scrollbar { width:4px; }
+.messages::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.1); border-radius:99px; }
+
+/* bubbles */
+.msg-row { display:flex; }
+.msg-row.user { justify-content:flex-end; }
+.msg-row.ai   { justify-content:flex-start; }
+
+.bubble {
+  max-width:82%;
+  border-radius:16px;
+  padding:13px 17px;
+  font-size:13.5px;
+  line-height:1.7;
+  animation:msgIn .4s cubic-bezier(.16,1,.3,1);
+}
+.bubble.user {
+  background:linear-gradient(135deg,rgba(59,130,246,0.28),rgba(168,85,247,0.22));
+  border:1px solid rgba(96,165,250,0.3);
+  border-bottom-right-radius:4px;
+}
+.bubble.ai {
+  background:rgba(255,255,255,0.04);
+  border:1px solid var(--border);
+  border-bottom-left-radius:4px;
+  display:flex; gap:12px; align-items:flex-start;
+}
+.bubble-icon { width:22px; height:22px; border-radius:7px; background:linear-gradient(135deg,#3b82f6,#9333ea); display:flex; align-items:center; justify-content:center; font-size:11px; flex-shrink:0; margin-top:1px; }
+.bubble-text { flex:1; min-width:0; }
+
+@keyframes msgIn {
+  from { opacity:0; transform:translateY(16px) scale(.97); }
+  to   { opacity:1; transform:translateY(0) scale(1); }
+}
+
+/* typing dots */
+.typing-wrap { display:flex; gap:5px; align-items:center; padding:4px 0; }
+.tdot { width:7px; height:7px; border-radius:50%; background:#3b82f6; animation:tdot 1.1s ease-in-out infinite; }
+.tdot:nth-child(2){ animation-delay:.18s; }
+.tdot:nth-child(3){ animation-delay:.36s; }
+@keyframes tdot{ 0%,60%,100%{transform:translateY(0);opacity:.45} 30%{transform:translateY(-8px);opacity:1} }
+
+/* answer markdown */
+.md strong { font-weight:600; color:#e2e8f0; }
+.md em { font-style:italic; color:#94a3b8; }
+.md code { background:rgba(96,165,250,0.13); border-radius:5px; padding:2px 7px; font-size:.83em; font-family:'JetBrains Mono',monospace; color:#93c5fd; }
+.md pre  { background:rgba(0,0,0,0.45); border:1px solid rgba(96,165,250,0.15); border-radius:10px; padding:14px; overflow-x:auto; margin:10px 0; }
+.md pre code { background:none; padding:0; }
+.md ul   { padding-left:1.2em; margin:6px 0; }
+.md li   { margin:3px 0; }
+.md p    { margin-bottom:8px; }
+.md h1,.md h2,.md h3 { font-weight:600; color:#f1f5f9; margin:10px 0 5px; }
+
+/* welcome */
+.welcome { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:48px 20px; text-align:center; flex:1; }
+.welcome-icon { width:72px; height:72px; border-radius:22px; background:linear-gradient(135deg,rgba(59,130,246,0.2),rgba(168,85,247,0.2)); border:1px solid rgba(96,165,250,0.2); display:flex; align-items:center; justify-content:center; font-size:32px; margin-bottom:20px; }
+.suggestions { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:18px; max-width:340px; }
+.sug-btn {
+  text-align:left; font-size:12px; padding:10px 13px; border-radius:10px;
+  background:rgba(255,255,255,0.03); border:1px solid var(--border);
+  color:var(--muted); cursor:pointer;
+  transition:all .2s ease;
+}
+.sug-btn:hover { background:rgba(255,255,255,0.07); border-color:rgba(96,165,250,0.3); color:#e2e8f0; transform:translateY(-1px); }
+
+/* chat input */
+.chat-input-area { padding:14px 20px; border-top:1px solid var(--border); }
+.scope-chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; align-items:center; }
+.scope-chip {
+  display:flex; align-items:center; gap:5px;
+  background:rgba(59,130,246,0.15); border:1px solid rgba(96,165,250,0.3);
+  border-radius:99px; padding:3px 10px; font-size:11px; color:#93c5fd;
+  animation:chipIn .3s cubic-bezier(.16,1,.3,1);
+}
+@keyframes chipIn{ from{opacity:0;transform:scale(.85)} to{opacity:1;transform:scale(1)} }
+.scope-chip button { color:rgba(147,197,253,.5); background:none; border:none; cursor:pointer; font-size:13px; line-height:1; padding:0 0 0 2px; transition:color .15s; }
+.scope-chip button:hover { color:#f87171; }
+
+.input-row { display:flex; gap:10px; align-items:flex-end; }
+.textarea-wrap { flex:1; position:relative; }
+textarea.qa {
+  width:100%; resize:none; overflow-y:auto;
+  background:rgba(255,255,255,0.04); border:1px solid var(--border);
+  border-radius:12px; padding:12px 42px 12px 14px;
+  color:var(--text); font-size:13.5px; font-family:'Inter',sans-serif;
+  line-height:1.5; max-height:140px;
+  transition: border-color .2s, background .2s;
+  outline:none;
+}
+textarea.qa:focus { border-color:rgba(96,165,250,0.45); background:rgba(255,255,255,0.06); }
+textarea.qa::placeholder { color:var(--muted); }
+.char-count { position:absolute; right:11px; bottom:11px; font-size:10px; color:var(--muted); pointer-events:none; }
+
+.btn-ask {
+  background:linear-gradient(135deg,#3b82f6,#9333ea);
+  border:none; border-radius:12px;
+  width:44px; height:44px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; transition:transform .2s, box-shadow .2s, opacity .2s;
+  position:relative; overflow:hidden;
+}
+.btn-ask::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent); background-size:200% 100%; animation:shimmer 2.5s linear infinite; }
+.btn-ask:hover:not(:disabled){ transform:scale(1.08) translateY(-1px); box-shadow:0 6px 24px rgba(59,130,246,0.5); }
+.btn-ask:active:not(:disabled){ transform:scale(.94); }
+.btn-ask:disabled{ opacity:.35; cursor:not-allowed; }
+
+/* ── Toast ── */
+#toasts { position:fixed; top:18px; right:18px; z-index:200; display:flex; flex-direction:column; gap:8px; pointer-events:none; }
+.toast-item {
+  pointer-events:auto;
+  display:flex; align-items:center; gap:10px;
+  background:rgba(15,20,30,0.92); backdrop-filter:blur(16px);
+  border:1px solid; border-radius:12px;
+  padding:11px 15px; font-size:13px; min-width:220px; max-width:300px;
+  box-shadow:0 8px 32px rgba(0,0,0,0.4);
+  animation:toastIn .4s cubic-bezier(.16,1,.3,1);
+}
+.toast-item.success{ border-color:rgba(52,211,153,.35); color:#6ee7b7; }
+.toast-item.error  { border-color:rgba(248,113,113,.35); color:#fca5a5; }
+.toast-item.warning{ border-color:rgba(251,191,36,.35); color:#fde68a; }
+.toast-item.info   { border-color:rgba(96,165,250,.35); color:#93c5fd; }
+.toast-item.hide   { animation:toastOut .3s forwards; }
+@keyframes toastIn  { from{opacity:0;transform:translateX(20px) scale(.95)} to{opacity:1;transform:none} }
+@keyframes toastOut { to{opacity:0;transform:translateX(20px) scale(.95)} }
+
+/* ── Animations ── */
+@keyframes slideUp   { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:none} }
+@keyframes fadeIn    { from{opacity:0} to{opacity:1} }
+@keyframes floatY    { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)} }
+@keyframes rotateSlow{ to{transform:rotate(360deg)} }
+@keyframes glowPulse { 0%,100%{box-shadow:0 0 0 0 rgba(59,130,246,.45)} 50%{box-shadow:0 0 0 10px rgba(59,130,246,0)} }
+
+.float    { animation:floatY 5s ease-in-out infinite; }
+.glow-anim{ animation:glowPulse 3s ease-in-out infinite; }
+.fade-in  { animation:fadeIn .5s ease both; }
+
+/* Section titles */
+.section-title { font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; display:flex; align-items:center; gap:7px; margin-bottom:14px; }
+.section-title span { width:18px; height:18px; border-radius:5px; display:flex; align-items:center; justify-content:center; font-size:10px; }
+
+/* scrollbar global */
+::-webkit-scrollbar{ width:5px; height:5px; }
+::-webkit-scrollbar-track{ background:transparent; }
+::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.1); border-radius:99px; }
+::-webkit-scrollbar-thumb:hover{ background:rgba(255,255,255,.2); }
+</style>
+</head>
+
+<body>
+<canvas id="bg-canvas"></canvas>
+<div id="toasts"></div>
+
+<div class="app">
+
+  <!-- ══ HEADER ══ -->
+  <header class="header" id="header">
+    <div style="display:flex;align-items:center;gap:13px">
+      <div class="logo-mark glow-anim">✦</div>
+      <div>
+        <div class="logo-text grad">RAG AI Docs</div>
+        <div class="logo-sub">Gemini · ChromaDB · FastAPI</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="pill">
+        <div class="dot" id="statusDot"></div>
+        <span id="statusText" style="color:var(--muted)">Connecting…</span>
+      </div>
+      <div class="pill">
+        <svg width="13" height="13" fill="none" stroke="#60a5fa" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        <span id="headerDocCount" style="color:var(--muted)">0</span>
+        <span style="color:var(--muted)">docs</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ══ BODY ══ -->
+  <div class="main-grid">
+
+    <!-- ── LEFT PANEL ── -->
+    <div style="display:flex;flex-direction:column;gap:16px">
+
+      <!-- Upload card -->
+      <div class="glass card" id="uploadCard">
+        <div class="section-title">
+          <span style="background:rgba(59,130,246,.2);color:#60a5fa">↑</span>
+          Upload Files
+        </div>
+
+        <!-- Dropzone visual -->
+        <div id="dropZone" class="dropzone" style="text-align:center">
+          <div class="dropzone-icon" style="margin:0 auto 12px">
+            <svg width="24" height="24" fill="none" stroke="#60a5fa" stroke-width="1.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 16V8m0 0l-3 3m3-3l3 3M20.5 16.5A3.5 3.5 0 0017 13H16a5 5 0 10-9.9 1M20.5 16.5a3.5 3.5 0 01-3.5 3.5H7a3.5 3.5 0 01-3.5-3.5"/>
+            </svg>
+          </div>
+          <p style="font-size:13px;font-weight:500;color:#cbd5e1;margin-bottom:4px">Drop files here</p>
+          <p style="font-size:11px;color:var(--muted);margin-bottom:14px">PDF · DOCX · XLSX · PPTX · TXT · CSV · HTML · SVG · Images</p>
+
+          <!-- Button with real file input overlaid on top — guaranteed click -->
+          <div style="position:relative;display:inline-block">
+            <span style="display:inline-block;background:rgba(96,165,250,0.15);border:1px solid rgba(96,165,250,0.4);border-radius:8px;padding:8px 22px;color:#60a5fa;font-size:12.5px;font-weight:600;font-family:inherit;pointer-events:none">
+              Browse Files
+            </span>
+            <input id="fileInput" type="file"
+              accept=".pdf,.docx,.doc,.xlsx,.xls,.pptx,.ppt,.txt,.md,.csv,.html,.htm,.svg,.png,.jpg,.jpeg,.webp,.bmp,.tiff"
+              multiple
+              style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0"/>
+          </div>
+        </div>
+
+        <!-- File list -->
+        <div id="fileList" style="margin-top:10px;display:flex;flex-direction:column;gap:6px;max-height:130px;overflow-y:auto"></div>
+
+        <!-- Progress -->
+        <div id="uploadProgress" style="display:none;margin-top:12px">
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:6px">
+            <span id="progressLabel">Processing…</span>
+            <span id="progressPct">0%</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="progressBar" style="width:0%"></div>
+          </div>
+        </div>
+
+        <!-- Upload btn -->
+        <button class="btn-primary" id="uploadBtn" style="margin-top:13px" disabled>
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v8"/></svg>
+          <span id="uploadBtnLabel">Upload & Process</span>
+        </button>
+      </div>
+
+      <!-- URL ingest card -->
+      <div class="glass card" id="urlCard">
+        <div class="section-title">
+          <span style="background:rgba(16,185,129,.2);color:#34d399">🔗</span>
+          Ingest from URL
+        </div>
+
+        <div style="position:relative">
+          <input
+            id="urlInput"
+            type="url"
+            placeholder="https://docs.example.com/page"
+            style="width:100%;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:11px;padding:11px 14px 11px 38px;color:var(--text);font-size:13px;font-family:'Inter',sans-serif;outline:none;transition:border-color .2s,background .2s"
+            onfocus="this.style.borderColor='rgba(52,211,153,.45)';this.style.background='rgba(255,255,255,0.07)'"
+            onblur="this.style.borderColor='var(--border)';this.style.background='rgba(255,255,255,0.04)'"
+          />
+          <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);pointer-events:none" width="14" height="14" fill="none" stroke="#34d399" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+          </svg>
+        </div>
+
+        <!-- URL progress -->
+        <div id="urlProgress" style="display:none;margin-top:10px">
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:6px">
+            <span id="urlProgressLabel">Fetching…</span>
+            <span id="urlProgressPct">0%</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="urlProgressBar" style="width:0%"></div>
+          </div>
+        </div>
+
+        <button class="btn-primary" id="urlBtn" style="margin-top:11px;background:linear-gradient(135deg,#059669,#0d9488)" disabled>
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+          Fetch & Index
+        </button>
+
+        <p style="font-size:10.5px;color:var(--muted);margin-top:10px;line-height:1.5">
+          Supports any public webpage, documentation site, blog post, or PDF URL. The page content will be chunked and indexed just like a PDF.
+        </p>
+      </div>
+
+      <!-- Documents card -->
+      <div class="glass card" id="docsCard">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <div class="section-title" style="margin-bottom:0">
+            <span style="background:rgba(168,85,247,.2);color:#c084fc">☰</span>
+            Documents
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <button id="refreshBtn" style="background:none;border:none;cursor:pointer;color:var(--muted);transition:color .2s" title="Refresh">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            </button>
+            <span id="docCount" style="font-size:11px;color:var(--muted)">0 docs</span>
+          </div>
+        </div>
+        <div id="docsList" style="display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto;padding-right:2px">
+          <div style="display:flex;flex-direction:column;align-items:center;padding:30px 0;opacity:.4;gap:8px">
+            <div class="float" style="font-size:28px">📄</div>
+            <p style="font-size:12px;color:var(--muted)">No documents yet</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats card -->
+      <div class="glass card" id="statsCard" style="display:none">
+        <div class="section-title">
+          <span style="background:rgba(16,185,129,.2);color:#34d399">◈</span>
+          Knowledge Base
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+          <div style="text-align:center">
+            <div class="stat-val grad" id="statDocs">0</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:3px">Docs</div>
+          </div>
+          <div style="text-align:center">
+            <div class="stat-val" style="background:linear-gradient(135deg,#c084fc,#f472b6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text" id="statPages">0</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:3px">Pages</div>
+          </div>
+          <div style="text-align:center">
+            <div class="stat-val" style="color:#34d399" id="statChunks">0</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:3px">Chunks</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CHAT PANEL ── -->
+    <div class="glass chat-wrap" id="chatCard">
+
+      <!-- Chat header -->
+      <div class="chat-header">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="ai-avatar">✦</div>
+          <div>
+            <div style="font-size:14px;font-weight:600">AI Assistant</div>
+            <div style="font-size:11px;color:var(--muted)" id="scopeLabel">Searching all documents</div>
+          </div>
+        </div>
+        <button id="clearChat" style="background:none;border:none;cursor:pointer;color:var(--muted);transition:color .2s" title="Clear chat">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+        </button>
+      </div>
+
+      <!-- Messages -->
+      <div class="messages" id="messages">
+        <div class="welcome" id="welcomeScreen">
+          <div class="welcome-icon float">🧠</div>
+          <h2 style="font-size:20px;font-weight:700;letter-spacing:-.3px" class="grad">Ask Your Documents</h2>
+          <p style="font-size:13px;color:var(--muted);margin-top:8px;max-width:280px;line-height:1.6">Upload PDFs, ask questions in natural language. I'll find what matters and answer clearly.</p>
+          <div class="suggestions">
+            <button class="sug-btn" onclick="setQ('What is this document about?')">💬 What is this about?</button>
+            <button class="sug-btn" onclick="setQ('Summarize the key points')">📋 Key points summary</button>
+            <button class="sug-btn" onclick="setQ('What are the main conclusions?')">🎯 Main conclusions</button>
+            <button class="sug-btn" onclick="setQ('List important definitions')">📚 Important definitions</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Input -->
+      <div class="chat-input-area">
+        <div id="scopeChips" class="scope-chips" style="display:none"></div>
+        <div class="input-row">
+          <div class="textarea-wrap">
+            <textarea class="qa" id="questionInput" rows="1" placeholder="Ask a question about your documents…"></textarea>
+            <span class="char-count" id="charCount">0</span>
+          </div>
+          <button class="btn-ask" id="askBtn" disabled>
+            <svg width="17" height="17" fill="none" stroke="white" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ SCRIPTS ════════════════ -->
+<script>
+const API = 'http://localhost:8000';
+let docs = {}, selectedIds = new Set(), selectedFiles = [], isQuerying = false;
+let chatHistory = [];  // [{role:'user'|'ai', content:'...'}]
+
+// ── DOM shortcuts ──
+const $ = id => document.getElementById(id);
+
+// ── GSAP entrance animations on load ──
+window.addEventListener('DOMContentLoaded', () => {
+  gsap.from('#header',     { y:-40, opacity:0, duration:.7, ease:'power3.out' });
+  gsap.from('#uploadCard', { x:-30, opacity:0, duration:.7, delay:.15, ease:'power3.out' });
+  gsap.from('#urlCard',    { x:-30, opacity:0, duration:.7, delay:.25, ease:'power3.out' });
+  gsap.from('#docsCard',   { x:-30, opacity:0, duration:.7, delay:.35, ease:'power3.out' });
+  gsap.from('#chatCard',   { x:30,  opacity:0, duration:.7, delay:.2,  ease:'power3.out' });
+  checkHealth();
+  loadDocs();
+  setInterval(loadDocs, 30000);
+});
+
+// ── Background: animated mesh gradient ──
+(function bg() {
+  const canvas = $('bg-canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H;
+  const pts = [];
+
+  function resize() {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  class Pt {
+    constructor() { this.reset(); }
+    reset() {
+      this.x  = Math.random() * W;
+      this.y  = Math.random() * H;
+      this.r  = Math.random() * 1.4 + 0.3;
+      this.vx = (Math.random() - .5) * .28;
+      this.vy = (Math.random() - .5) * .28;
+      this.a  = Math.random() * .35 + .08;
+      this.c  = Math.random() > .5 ? '96,165,250' : '192,132,252';
+    }
+    tick() {
+      this.x += this.vx; this.y += this.vy;
+      if (this.x < 0 || this.x > W || this.y < 0 || this.y > H) this.reset();
+    }
+    draw() {
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.r, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(${this.c},${this.a})`;
+      ctx.fill();
+    }
+  }
+
+  for (let i=0; i<90; i++) pts.push(new Pt());
+
+  function frame() {
+    ctx.clearRect(0,0,W,H);
+
+    // radial glow blobs
+    const g1 = ctx.createRadialGradient(W*.18,H*.12,0,W*.18,H*.12,W*.45);
+    g1.addColorStop(0,'rgba(59,130,246,.09)'); g1.addColorStop(1,'transparent');
+    ctx.fillStyle = g1; ctx.fillRect(0,0,W,H);
+
+    const g2 = ctx.createRadialGradient(W*.82,H*.82,0,W*.82,H*.82,W*.4);
+    g2.addColorStop(0,'rgba(168,85,247,.07)'); g2.addColorStop(1,'transparent');
+    ctx.fillStyle = g2; ctx.fillRect(0,0,W,H);
+
+    // connections
+    for (let i=0;i<pts.length;i++) for (let j=i+1;j<pts.length;j++) {
+      const dx=pts[i].x-pts[j].x, dy=pts[i].y-pts[j].y, d=Math.hypot(dx,dy);
+      if (d<110) {
+        ctx.beginPath(); ctx.moveTo(pts[i].x,pts[i].y); ctx.lineTo(pts[j].x,pts[j].y);
+        ctx.strokeStyle=`rgba(96,165,250,${.055*(1-d/110)})`; ctx.lineWidth=.5; ctx.stroke();
+      }
+    }
+    pts.forEach(p=>{ p.tick(); p.draw(); });
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+
+// ── Toast ──
+function toast(msg, type='info', ms=4000) {
+  const icons = {success:'✓',error:'✕',warning:'⚠',info:'ℹ'};
+  const el = document.createElement('div');
+  el.className = `toast-item ${type}`;
+  el.innerHTML = `<span style="font-size:14px;flex-shrink:0">${icons[type]}</span><span>${msg}</span>`;
+  $('toasts').appendChild(el);
+  setTimeout(()=>{ el.classList.add('hide'); setTimeout(()=>el.remove(),320); }, ms);
+}
+
+// ── Health ──
+async function checkHealth() {
+  try {
+    const r = await fetch(`${API}/health`);
+    if (r.ok) {
+      $('statusDot').className = 'dot online';
+      $('statusText').textContent = 'Online';
+      $('statusText').style.color = '#34d399';
+    } else throw 0;
+  } catch {
+    $('statusDot').className = 'dot offline';
+    $('statusText').textContent = 'Offline';
+    $('statusText').style.color = '#f87171';
+  }
+}
+
+// ── File handling ──
+function fmtSize(b) {
+  return b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB';
+}
+
+function renderFileList() {
+  const fl = $('fileList');
+  if (!selectedFiles.length) {
+    fl.innerHTML = '';
+    $('uploadBtn').disabled = true;
+    $('uploadBtnLabel').textContent = 'Upload & Process';
+    return;
+  }
+  const count = selectedFiles.length;
+  $('uploadBtnLabel').textContent = count > 1 ? `Upload ${count} Files` : 'Upload & Process';
+  $('uploadBtn').disabled = false;
+
+  // File type → badge color + label
+  const typeStyle = {
+    pdf:  ['rgba(239,68,68,.2)',   '#fca5a5', 'PDF'],
+    docx: ['rgba(59,130,246,.2)',  '#93c5fd', 'DOC'],
+    doc:  ['rgba(59,130,246,.2)',  '#93c5fd', 'DOC'],
+    xlsx: ['rgba(16,185,129,.2)',  '#6ee7b7', 'XLS'],
+    xls:  ['rgba(16,185,129,.2)',  '#6ee7b7', 'XLS'],
+    pptx: ['rgba(251,146,60,.2)',  '#fdba74', 'PPT'],
+    ppt:  ['rgba(251,146,60,.2)',  '#fdba74', 'PPT'],
+    csv:  ['rgba(16,185,129,.2)',  '#6ee7b7', 'CSV'],
+    txt:  ['rgba(148,163,184,.2)', '#cbd5e1', 'TXT'],
+    md:   ['rgba(148,163,184,.2)', '#cbd5e1', 'MD'],
+    html: ['rgba(251,191,36,.2)',  '#fde68a', 'HTML'],
+    htm:  ['rgba(251,191,36,.2)',  '#fde68a', 'HTML'],
+    svg:  ['rgba(168,85,247,.2)',  '#d8b4fe', 'SVG'],
+    png:  ['rgba(244,114,182,.2)', '#f9a8d4', 'IMG'],
+    jpg:  ['rgba(244,114,182,.2)', '#f9a8d4', 'IMG'],
+    jpeg: ['rgba(244,114,182,.2)', '#f9a8d4', 'IMG'],
+    webp: ['rgba(244,114,182,.2)', '#f9a8d4', 'IMG'],
+  };
+
+  fl.innerHTML = selectedFiles.map((f,i) => {
+    const ext = f.name.split('.').pop().toLowerCase();
+    const [bg, fg, label] = typeStyle[ext] || ['rgba(148,163,184,.2)', '#cbd5e1', ext.toUpperCase().slice(0,4)];
+    return `
+      <div class="file-item">
+        <div class="file-badge" style="background:${bg};color:${fg};font-size:9px">${label}</div>
+        <div style="flex:1;min-width:0">
+          <p style="font-size:12px;font-weight:500;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(f.name)}</p>
+          <p style="font-size:10px;color:var(--muted)">${fmtSize(f.size)}</p>
+        </div>
+        <button onclick="rmFile(${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;transition:color .15s;padding:0 2px" onmouseover="this.style.color='#f87171'" onmouseout="this.style.color='var(--muted)'">✕</button>
+      </div>`;
+  }).join('');
+}
+
+function addFiles(list) {
+  const SUPPORTED = new Set(['.pdf','.docx','.doc','.xlsx','.xls','.pptx','.ppt','.txt','.md','.csv','.html','.htm','.svg','.png','.jpg','.jpeg','.webp','.bmp','.tiff']);
+  const valid   = [...list].filter(f => SUPPORTED.has('.'+f.name.split('.').pop().toLowerCase()));
+  const skipped = list.length - valid.length;
+  if (skipped) toast(`${skipped} unsupported file(s) skipped`,'warning');
+  if (!valid.length) return;
+  const ex = new Set(selectedFiles.map(f=>f.name));
+  selectedFiles = [...selectedFiles, ...valid.filter(f=>!ex.has(f.name))];
+  renderFileList();
+  gsap.from('.file-item:last-child',{x:-10,opacity:0,duration:.3,ease:'power2.out'});
+}
+
+window.rmFile = i => { selectedFiles.splice(i,1); renderFileList(); };
+
+// ── File input wiring ──
+const fileInput = $('fileInput');
+
+fileInput.addEventListener('change', function() {
+  if (this.files && this.files.length) {
+    addFiles(this.files);
+    this.value = '';
+  }
+});
+
+$('dropZone').addEventListener('dragover',  e=>{ e.preventDefault(); e.stopPropagation(); $('dropZone').classList.add('over'); });
+$('dropZone').addEventListener('dragleave', e=>{ e.stopPropagation(); $('dropZone').classList.remove('over'); });
+$('dropZone').addEventListener('drop', e=>{
+  e.preventDefault(); e.stopPropagation();
+  $('dropZone').classList.remove('over');
+  if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
+});
+
+// ── Progress animation ──
+async function animProg(from, to, ms, label) {
+  $('progressLabel').textContent = label;
+  const bar = $('progressBar'), pct = $('progressPct');
+  const steps = 24, dt = ms/steps;
+  for (let i=0;i<=steps;i++) {
+    const v = from+(to-from)*(i/steps);
+    bar.style.width = v+'%';
+    pct.textContent = Math.round(v)+'%';
+    await new Promise(r=>setTimeout(r,dt));
+  }
+}
+
+// ── Upload ──
+$('uploadBtn').addEventListener('click', async()=>{
+  if (!selectedFiles.length) return;
+  const isBulk = selectedFiles.length > 1;
+  $('uploadBtn').disabled = true;
+  $('uploadProgress').style.display = 'block';
+  gsap.from('#uploadProgress',{opacity:0,y:6,duration:.3,ease:'power2.out'});
+
+  if (isBulk) {
+    await animProg(0, 20, 300, `Preparing ${selectedFiles.length} files…`);
+    const fd = new FormData();
+    selectedFiles.forEach(f => fd.append('files', f));
+    try {
+      await animProg(20, 55, 400, 'Uploading files…');
+      const res  = await fetch(`${API}/upload/bulk`, { method:'POST', body:fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Bulk upload failed');
+      await animProg(55, 100, 500, 'Embedding chunks…');
+      const failed = data.summary?.failed || 0;
+      toast(`✓ ${data.summary.success}/${data.summary.total} files processed${failed ? ` (${failed} failed)` : ''}`,
+            failed ? 'warning' : 'success', 6000);
+      (data.results || []).filter(r => r.status === 'error').forEach(r =>
+        toast(`✗ ${r.filename}: ${r.error}`, 'error', 8000));
+    } catch(e) {
+      toast(e.message || 'Bulk upload failed', 'error');
+      $('uploadProgress').style.display = 'none';
+      $('uploadBtn').disabled = false;
+      return;
+    }
+  } else {
+    const fname = selectedFiles[0].name;
+    await animProg(0, 20, 300, `Reading ${fname}…`);
+    const fd = new FormData();
+    fd.append('file', selectedFiles[0]);
+    try {
+      await animProg(20, 60, 500, 'Uploading & chunking…');
+      const res  = await fetch(`${API}/upload`, { method:'POST', body:fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Upload failed');
+      await animProg(60, 100, 400, 'Embedding complete!');
+      toast(`✓ ${data.filename} — ${data.total_chunks} chunks indexed`, 'success', 5000);
+    } catch(e) {
+      toast(e.message || 'Upload failed', 'error');
+      $('uploadProgress').style.display = 'none';
+      $('uploadBtn').disabled = false;
+      return;
+    }
+  }
+
+  setTimeout(()=>{
+    $('uploadProgress').style.display='none';
+    selectedFiles=[]; renderFileList();
+  },700);
+  await loadDocs();
+});
+
+// ── Docs ──
+async function loadDocs() {
+  try {
+    const res = await fetch(`${API}/documents`);
+    docs = (await res.json()).documents || {};
+    renderDocs(); updateStats();
+  } catch { toast('Failed to load documents','error'); }
+}
+
+function renderDocs() {
+  const keys = Object.keys(docs);
+  $('headerDocCount').textContent = keys.length;
+  $('docCount').textContent = keys.length + ' doc' + (keys.length!==1?'s':'');
+
+  if (!keys.length) {
+    $('docsList').innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;padding:30px 0;opacity:.4;gap:8px"><div class="float" style="font-size:28px">📄</div><p style="font-size:12px;color:var(--muted)">No documents yet</p></div>`;
+    $('statsCard').style.display='none'; return;
+  }
+  $('statsCard').style.display='block';
+
+  const colors=[['rgba(59,130,246,.22)','#3b82f6'],['rgba(168,85,247,.22)','#a855f7'],['rgba(16,185,129,.22)','#10b981'],['rgba(251,191,36,.22)','#fbbf24']];
+  $('docsList').innerHTML = keys.map((id,i)=>{
+    const d=docs[id], sel=selectedIds.has(id), [bg,fg]=colors[i%4];
+    const isUrl = d.type === 'url';
+    const fileType = d.file_type || 'PDF';
+    const badge = isUrl
+      ? `<div style="width:28px;height:28px;border-radius:7px;background:${bg};display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">🔗</div>`
+      : `<div style="width:28px;height:28px;border-radius:7px;background:${bg};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:${fg};flex-shrink:0">${fileType.slice(0,4)}</div>`;
+    const subtitle = isUrl
+      ? `<p style="font-size:10px;color:var(--muted)">${d.total_pages} sections · ${d.total_chunks} chunks · ${id}</p>`
+      : `<p style="font-size:10px;color:var(--muted)">${d.total_pages}p · ${d.total_chunks} chunks · ${id}</p>`;
+    return `<div class="doc-item${sel?' sel':''}" onclick="toggleDoc('${id}')" style="animation-delay:${i*50}ms">
+      ${badge}
+      <div style="flex:1;min-width:0">
+        <p style="font-size:12px;font-weight:500;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(d.filename)}</p>
+        ${subtitle}
+      </div>
+      <div class="doc-check">${sel?'<svg width="10" height="10" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>':''}</div>
+    </div>`;
+  }).join('');
+
+  updateScopeUI();
+}
+
+function toggleDoc(id) {
+  selectedIds.has(id) ? selectedIds.delete(id) : selectedIds.add(id);
+  renderDocs(); updateScopeUI();
+}
+
+function updateScopeUI() {
+  const sel = [...selectedIds];
+  $('scopeLabel').textContent = sel.length ? `Searching ${sel.length} selected doc${sel.length>1?'s':''}` : 'Searching all documents';
+
+  if (!sel.length) { $('scopeChips').style.display='none'; $('scopeChips').innerHTML=''; return; }
+  $('scopeChips').style.display='flex';
+  $('scopeChips').innerHTML = `<span style="font-size:11px;color:var(--muted)">Scope:</span>`
+    + sel.map(id=>`<span class="scope-chip">${esc(docs[id]?.filename.replace('.pdf','')||id)}<button onclick="toggleDoc('${id}')">✕</button></span>`).join('');
+}
+
+function updateStats() {
+  const keys = Object.keys(docs);
+  $('statDocs').textContent   = keys.length;
+  $('statPages').textContent  = keys.reduce((s,k)=>s+docs[k].total_pages,0);
+  $('statChunks').textContent = keys.reduce((s,k)=>s+docs[k].total_chunks,0);
+  if (keys.length) {
+    gsap.from('#statsCard',{y:12,opacity:0,duration:.5,ease:'power2.out'});
+  }
+}
+
+$('refreshBtn').addEventListener('click', ()=>{
+  gsap.to('#refreshBtn svg',{rotation:'+=360',duration:.5,ease:'power2.inOut'});
+  loadDocs();
+});
+
+// ── Chat ──
+function hideWelcome() {
+  const w = $('welcomeScreen');
+  if (w) { gsap.to(w,{opacity:0,scale:.95,duration:.3,ease:'power2.in',onComplete:()=>w.remove()}); }
+}
+
+function appendUser(text) {
+  hideWelcome();
+  const row = document.createElement('div');
+  row.className = 'msg-row user';
+  row.innerHTML = `<div class="bubble user">${esc(text)}</div>`;
+  $('messages').appendChild(row);
+  gsap.from(row,{opacity:0,y:14,scale:.97,duration:.4,ease:'power3.out'});
+  scrollBottom();
+}
+
+function appendAI(text, qtype) {
+  const typeBadge = qtype ? `<span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:2px 8px;border-radius:99px;background:rgba(96,165,250,.15);color:#60a5fa;border:1px solid rgba(96,165,250,.25);margin-bottom:8px;display:inline-block">${qtype}</span><br/>` : '';
+  const row = document.createElement('div');
+  row.className = 'msg-row ai';
+  row.innerHTML = `
+    <div class="bubble ai">
+      <div class="bubble-icon">✦</div>
+      <div class="bubble-text md">${typeBadge}${md(text)}</div>
+    </div>`;
+  $('messages').appendChild(row);
+  gsap.from(row,{opacity:0,y:14,scale:.97,duration:.45,ease:'power3.out'});
+  scrollBottom();
+}
+
+function showTyping() {
+  hideWelcome();
+  const row = document.createElement('div');
+  row.id = 'typingRow'; row.className = 'msg-row ai';
+  row.innerHTML = `
+    <div class="bubble ai">
+      <div class="bubble-icon">✦</div>
+      <div class="typing-wrap"><div class="tdot"></div><div class="tdot"></div><div class="tdot"></div></div>
+    </div>`;
+  $('messages').appendChild(row);
+  gsap.from(row,{opacity:0,y:10,duration:.3,ease:'power2.out'});
+  scrollBottom();
+}
+function hideTyping() { const t=$('typingRow'); if(t){ gsap.to(t,{opacity:0,y:-5,duration:.2,onComplete:()=>t.remove()}); } }
+
+function scrollBottom() {
+  const m=$('messages');
+  gsap.to(m,{scrollTop:m.scrollHeight,duration:.4,ease:'power2.out'});
+}
+
+// ── Markdown renderer ──
+function md(s) {
+  return s
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/```([\s\S]*?)```/g,'<pre><code>$1</code></pre>')
+    .replace(/`([^`]+)`/g,'<code>$1</code>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/^#{1,3} (.+)/gm,'<strong style="font-size:14px;color:#f1f5f9;display:block;margin:8px 0 4px">$1</strong>')
+    .replace(/^[-*] (.+)/gm,'<li>$1</li>')
+    .replace(/(<li>.*<\/li>)/s,'<ul>$1</ul>')
+    .replace(/\n\n/g,'</p><p class="mb-2">')
+    .replace(/\n/g,'<br/>');
+}
+
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── Ask ──
+async function ask() {
+  const q = $('questionInput').value.trim();
+  if (!q || isQuerying) return;
+  isQuerying = true;
+  $('askBtn').disabled = true;
+  $('questionInput').value = '';
+  $('charCount').textContent = '0';
+  autoResize();
+
+  appendUser(q);
+  showTyping();
+
+  try {
+    const body = { question: q };
+    if (selectedIds.size) body.doc_ids = [...selectedIds];
+    if (chatHistory.length) body.chat_history = chatHistory.slice(-6); // last 3 exchanges
+    const res  = await fetch(`${API}/query`,{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+    const data = await res.json();
+    hideTyping();
+    if (!res.ok) throw new Error(data.detail||'Query failed');
+    appendAI(data.answer, data.query_type);
+    // store in history for follow-up context
+    chatHistory.push({ role:'user', content: q });
+    chatHistory.push({ role:'ai',   content: data.answer });
+    if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
+  } catch(e) {
+    hideTyping();
+    appendAI(`⚠ ${e.message||'Something went wrong'}`, null);
+    toast(e.message,'error');
+  } finally {
+    isQuerying = false;
+    $('askBtn').disabled = false;
+    $('questionInput').focus();
+  }
+}
+
+$('askBtn').addEventListener('click', ask);
+$('questionInput').addEventListener('keydown', e=>{ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();ask();} });
+$('questionInput').addEventListener('input', ()=>{
+  const v = $('questionInput').value;
+  $('charCount').textContent = v.length;
+  $('askBtn').disabled = !v.trim() || isQuerying;
+  autoResize();
+});
+
+function autoResize() {
+  const t=$('questionInput'); t.style.height='auto'; t.style.height=Math.min(t.scrollHeight,140)+'px';
+}
+
+window.setQ = q => {
+  $('questionInput').value = q;
+  $('charCount').textContent = q.length;
+  $('askBtn').disabled = false;
+  $('questionInput').focus(); autoResize();
+};
+
+$('clearChat').addEventListener('click', ()=>{
+  chatHistory = [];
+  gsap.to('#messages',{opacity:0,duration:.25,onComplete:()=>{
+    $('messages').innerHTML=`
+      <div class="welcome" id="welcomeScreen">
+        <div class="welcome-icon float">🧠</div>
+        <h2 style="font-size:20px;font-weight:700;letter-spacing:-.3px" class="grad">Ask Your Documents</h2>
+        <p style="font-size:13px;color:var(--muted);margin-top:8px;max-width:280px;line-height:1.6">Upload PDFs, ask questions in natural language.</p>
+        <div class="suggestions">
+          <button class="sug-btn" onclick="setQ('What is this document about?')">💬 What is this about?</button>
+          <button class="sug-btn" onclick="setQ('Summarize the key points')">📋 Key points summary</button>
+          <button class="sug-btn" onclick="setQ('What are the main conclusions?')">🎯 Main conclusions</button>
+          <button class="sug-btn" onclick="setQ('List important definitions')">📚 Important definitions</button>
+        </div>
+      </div>`;
+    gsap.to('#messages',{opacity:1,duration:.3});
+  }});
+  toast('Chat cleared','info',2000);
+});
+
+// ── URL Ingest ──
+(function() {
+  const urlInput = $('urlInput');
+  const urlBtn   = $('urlBtn');
+
+  // Enable button when valid URL typed
+  urlInput.addEventListener('input', () => {
+    const v = urlInput.value.trim();
+    urlBtn.disabled = !(v.startsWith('http://') || v.startsWith('https://'));
+  });
+
+  // Submit on Enter
+  urlInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !urlBtn.disabled) urlBtn.click();
+  });
+
+  urlBtn.addEventListener('click', async () => {
+    const url = urlInput.value.trim();
+    if (!url) return;
+
+    urlBtn.disabled = true;
+    $('urlProgress').style.display = 'block';
+    gsap.from('#urlProgress', { opacity:0, y:5, duration:.3, ease:'power2.out' });
+
+    async function animUrl(from, to, ms, label) {
+      $('urlProgressLabel').textContent = label;
+      const bar = $('urlProgressBar'), pct = $('urlProgressPct');
+      const steps=20, dt=ms/steps;
+      for (let i=0;i<=steps;i++) {
+        const v=from+(to-from)*(i/steps);
+        bar.style.width=v+'%'; pct.textContent=Math.round(v)+'%';
+        await new Promise(r=>setTimeout(r,dt));
+      }
+    }
+
+    try {
+      await animUrl(0, 30, 400, 'Fetching page…');
+      const res  = await fetch(`${API}/ingest-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      await animUrl(30, 75, 500, 'Chunking & embedding…');
+      const data = await res.json();
+      await animUrl(75, 100, 300, 'Done!');
+
+      if (!res.ok) throw new Error(data.detail || 'URL ingest failed');
+
+      toast(`✓ "${data.title}" — ${data.total_chunks} chunks indexed`, 'success', 6000);
+      urlInput.value = '';
+      urlBtn.disabled = true;
+      setTimeout(() => { $('urlProgress').style.display = 'none'; }, 700);
+      await loadDocs();
+
+    } catch(e) {
+      toast(e.message || 'URL ingest failed', 'error', 7000);
+      $('urlProgress').style.display = 'none';
+      urlBtn.disabled = false;
+    }
+  });
+})();
+</script>
+</body>
+</html>
