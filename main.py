@@ -8,6 +8,7 @@ import logging
 import os
 import tempfile
 import uuid
+import asyncio
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -58,8 +59,8 @@ async def _process_file(file: UploadFile) -> dict:
         tmp_path = tmp.name
 
     try:
-        extracted  = extract_file(tmp_path)
-        chunks     = chunk_text(extracted["pages"])
+        extracted  = await asyncio.to_thread(extract_file, tmp_path)
+        chunks     = await asyncio.to_thread(chunk_text, extracted["pages"])
         if not chunks:
             raise ValueError("No extractable text found in file")
         
@@ -72,8 +73,8 @@ async def _process_file(file: UploadFile) -> dict:
             warning_msg = "File too large for Free Tier. Only the first ~2MB were indexed."
 
         texts      = [c["text"] for c in chunks]
-        embeddings = get_batch_embeddings(texts)
-        vector_store.add_chunks(doc_id, chunks, embeddings)
+        embeddings = await get_batch_embeddings(texts)
+        await asyncio.to_thread(vector_store.add_chunks, doc_id, chunks, embeddings)
 
         meta = {
             "doc_id":       doc_id,
@@ -169,16 +170,16 @@ async def ingest_url(req: IngestUrlRequest):
 
     try:
         # 1. Fetch + extract text (same shape as pdf_service output)
-        extracted = fetch_url(url)
+        extracted = await asyncio.to_thread(fetch_url, url)
 
         # 2. Chunk
-        chunks = chunk_text(extracted["pages"])
+        chunks = await asyncio.to_thread(chunk_text, extracted["pages"])
         if not chunks:
             raise HTTPException(422, "No extractable text found at this URL")
 
         # 3. Embed
         texts      = [c["text"] for c in chunks]
-        embeddings = get_batch_embeddings(texts)
+        embeddings = await get_batch_embeddings(texts)
 
         # 4. Store — use doc_id based on domain so re-ingesting same site updates it
         from urllib.parse import urlparse
@@ -186,7 +187,7 @@ async def ingest_url(req: IngestUrlRequest):
         doc_id  = str(uuid.uuid4())[:8]
         display = extracted.get("title") or domain or url[:40]
 
-        vector_store.add_chunks(doc_id, chunks, embeddings)
+        await asyncio.to_thread(vector_store.add_chunks, doc_id, chunks, embeddings)
 
         uploaded_docs[doc_id] = {
             "filename":     display,
@@ -231,7 +232,7 @@ async def query_documents(req: QueryRequest):
         raise HTTPException(400, "Question cannot be empty")
 
     try:
-        result = answer_question(req.question, req.doc_ids, req.chat_history)
+        result = await answer_question(req.question, req.doc_ids, req.chat_history)
         return result
 
     except Exception as e:

@@ -8,8 +8,10 @@ RAG Service — Enhanced AI pipeline with:
 - Conversation-aware: accepts optional chat_history for follow-up questions
 """
 
+import asyncio
 import re
 import time
+import hashlib
 import logging
 from google import genai
 from google.genai import types
@@ -127,8 +129,29 @@ def _post_process(text: str) -> str:
     return text.strip()
 
 
+class SimpleTTLCache:
+    def __init__(self, ttl_seconds=3600):
+        self.cache = {}
+        self.ttl = ttl_seconds
+
+    def get(self, key):
+        if key in self.cache:
+            val, timestamp = self.cache[key]
+            if time.time() - timestamp < self.ttl:
+                return val
+            else:
+                del self.cache[key]
+        return None
+
+    def set(self, key, value):
+        self.cache[key] = (value, time.time())
+
+# Cache to avoid duplicate Gemini calls
+_query_cache = SimpleTTLCache(ttl_seconds=3600)
+
+
 # ─── Generate with model fallback ────────────────────────────────────────────
-def _generate(system: str, user: str) -> str:
+async def _generate(system: str, user: str) -> str:
     """Call Gemini with system + user message, fallback across models on quota errors."""
     last_err: Exception | None = None
 
@@ -136,7 +159,7 @@ def _generate(system: str, user: str) -> str:
         for attempt in range(2):
             try:
                 logger.info(f"LLM call: model={model} attempt={attempt + 1}")
-                response = _client.models.generate_content(
+                response = await _client.aio.models.generate_content(
                     model=model,
                     contents=user,
                     config=types.GenerateContentConfig(
@@ -162,7 +185,7 @@ def _generate(system: str, user: str) -> str:
 
                 if attempt == 0:
                     logger.warning(f"Rate limited on {model}, waiting 30s…")
-                    time.sleep(30)
+                    await asyncio.sleep(30)
                 else:
                     logger.warning(f"Still limited on {model}, trying next model")
                     break
@@ -175,7 +198,7 @@ def _generate(system: str, user: str) -> str:
 
 
 # ─── Main entry point ─────────────────────────────────────────────────────────
-def answer_question(
+async def answer_question(
     question: str,
     doc_ids: list[str] | None = None,
     chat_history: list[dict] | None = None,   # [{"role":"user"|"ai","content":"..."}]
@@ -202,10 +225,20 @@ def answer_question(
     top_k = _top_k_for_type(qtype)
     logger.info(f"Query type: {qtype} | top_k: {top_k}")
 
+    # Check Cache First
+    cache_key = hashlib.md5(f"{question}_{doc_ids}_{chat_history}".encode()).hexdigest()
+    cached_result = _query_cache.get(cache_key)
+    if cached_result:
+        logger.info("Serving answer from cache")
+        return cached_result
+
     # Step 2 — Embed + retrieve
-    query_embedding = get_query_embedding(question)
-    raw_chunks = vector_store.search(
+    query_embedding = await get_query_embedding(question)
+    # Run synchronous search in thread pool to avoid blocking
+    raw_chunks = await asyncio.to_thread(
+        vector_store.search,
         query_embedding=query_embedding,
+        query_text=question,
         doc_ids=doc_ids,
         top_k=top_k,
     )
@@ -246,12 +279,12 @@ Think carefully, then write your answer:"""
 
     # Step 6 — Generate
     system = _system_prompt(qtype)
-    raw_answer = _generate(system, user_message)
+    raw_answer = await _generate(system, user_message)
 
     # Step 7 — Post-process
     answer = _post_process(raw_answer)
 
-    return {
+    result = {
         "answer": answer,
         "query_type": qtype,
         "sources": [
@@ -264,3 +297,6 @@ Think carefully, then write your answer:"""
             for c in chunks
         ],
     }
+    
+    _query_cache.set(cache_key, result)
+    return result

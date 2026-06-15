@@ -4,8 +4,9 @@
 # 2. text-embedding-004 removed — NOT available on this key (404 error)
 # 3. All calls use new google-genai SDK: client.models.embed_content()
 # 4. Result extracted via result.embeddings[0].values
+# 5. ASYNC UPDATE: Moved to client.aio for non-blocking FastAPI performance.
 
-import time
+import asyncio
 import logging
 from google import genai
 from google.genai import types
@@ -19,9 +20,9 @@ _client = genai.Client(api_key=settings.gemini_api_key)
 EMBEDDING_MODEL = "gemini-embedding-001"
 
 
-def get_embedding(text: str) -> list[float]:
+async def get_embedding(text: str) -> list[float]:
     """Single document chunk ka embedding lo (RETRIEVAL_DOCUMENT task)."""
-    result = _client.models.embed_content(
+    result = await _client.aio.models.embed_content(
         model=EMBEDDING_MODEL,
         contents=text,
         config=types.EmbedContentConfig(task_type="RETRIEVAL_DOCUMENT"),
@@ -29,12 +30,12 @@ def get_embedding(text: str) -> list[float]:
     return result.embeddings[0].values
 
 
-def get_query_embedding(text: str) -> list[float]:
+async def get_query_embedding(text: str) -> list[float]:
     """User query ka embedding lo (RETRIEVAL_QUERY task).
 
     Different task_type than documents — improves retrieval accuracy.
     """
-    result = _client.models.embed_content(
+    result = await _client.aio.models.embed_content(
         model=EMBEDDING_MODEL,
         contents=text,
         config=types.EmbedContentConfig(task_type="RETRIEVAL_QUERY"),
@@ -42,7 +43,7 @@ def get_query_embedding(text: str) -> list[float]:
     return result.embeddings[0].values
 
 
-def get_batch_embeddings(texts: list[str]) -> list[list[float]]:
+async def get_batch_embeddings(texts: list[str]) -> list[list[float]]:
     """Multiple document chunks ke embeddings generate karo."""
     embeddings = []
     batch_size = 100
@@ -53,7 +54,7 @@ def get_batch_embeddings(texts: list[str]) -> list[list[float]]:
         
         for attempt in range(max_retries):
             try:
-                result = _client.models.embed_content(
+                result = await _client.aio.models.embed_content(
                     model=EMBEDDING_MODEL,
                     contents=batch,
                     config=types.EmbedContentConfig(task_type="RETRIEVAL_DOCUMENT"),
@@ -67,7 +68,7 @@ def get_batch_embeddings(texts: list[str]) -> list[list[float]]:
                     if attempt < max_retries - 1:
                         delay = base_delay * (2 ** attempt)
                         logger.warning(f"Rate limit hit. Retrying in {delay} seconds...")
-                        time.sleep(delay)
+                        await asyncio.sleep(delay)
                     else:
                         raise e
                 else:

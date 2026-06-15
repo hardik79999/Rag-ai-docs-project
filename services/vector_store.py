@@ -47,10 +47,11 @@ class ChromaVectorStore:
     def search(
         self,
         query_embedding: list[float],
+        query_text: str | None = None,
         doc_ids: list[str] | None = None,
         top_k: int = 5,
     ) -> list[dict]:
-        """Semantic search across all (or specific) document collections."""
+        """Semantic search with optional Keyword Overlap Boost (Hybrid Search)."""
         results = []
         collections = self.client.list_collections()
 
@@ -71,10 +72,21 @@ class ChromaVectorStore:
             )
 
             for i, doc in enumerate(res["documents"][0]):
+                base_score = 1 - res["distances"][0][i]  # cosine similarity
+                
+                # Hybrid Search: Keyword Boost
+                boost = 0.0
+                if query_text:
+                    query_terms = set(term.strip('.,?!;') for term in query_text.lower().split() if len(term) > 3)
+                    doc_lower = doc.lower()
+                    overlap = sum(1 for term in query_terms if term in doc_lower)
+                    if query_terms:
+                        boost = (overlap / len(query_terms)) * 0.15 # Up to +15% score for exact keyword matches
+                        
                 results.append({
                     "text": doc,
                     "metadata": res["metadatas"][0][i],
-                    "score": 1 - res["distances"][0][i],  # cosine similarity
+                    "score": base_score + boost,
                     "doc_id": col_doc_id,
                 })
 
