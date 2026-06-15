@@ -8,9 +8,14 @@
 ## 🧠 Project Overview
 
 Ek system banayenge jisme:
-- **Bulk PDF upload** karo → automatically chunks + embed hoga
+- **Bulk PDF & URL ingest** karo → automatically chunks + embed hoga
 - **Question pucho** → AI semantic search karega → relevant context dhundega → Gemini se answer milega
 - **Technology**: FastAPI + Gemini Embedding + PGVector (ya ChromaDB if no Postgres)
+
+✨ **Key Optimizations Included:**
+- ⚡ **Fully Asynchronous & Non-Blocking**: Thread-pooling for CPU-bound tasks and async Gemini API calls.
+- 🎯 **Hybrid Search**: Dense Vector Search (Cosine) + Keyword Overlap Boost (TF) for pinpoint accuracy.
+- 🚀 **Semantic Caching**: In-memory `TTLCache` to instantly serve identical queries and save API quota.
 
 ---
 
@@ -30,9 +35,10 @@ Ek system banayenge jisme:
 ┌─────────────────────────────────────────────────────────────┐
 │                     QUERY PIPELINE                          │
 │                                                             │
-│  User Question  →  Embed Query  →  Vector Search  →  Top K │
-│                    (Gemini)       (Cosine Sim)    Chunks    │
-│                                                     ↓       │
+│  User Question  →  Check Cache  →  Embed Query  →           │
+│      ↓               (TTLCache)      (Gemini)               │
+│  Vector Search + Keyword Boost  →  Top K Chunks             │
+│  (Hybrid Score)                       ↓                     │
 │                              Context + Question → Gemini    │
 │                                                    ↓        │
 │                                              Final Answer   │
@@ -48,11 +54,12 @@ Ek system banayenge jisme:
 | **API Framework** | FastAPI | REST endpoints |
 | **PDF Parsing** | PyMuPDF (fitz) | Text extract from PDF |
 | **Chunking** | LangChain Text Splitter | Split text into chunks |
-| **Embedding Model** | `gemini-embedding-002` | Text → Vector (768 dim) |
+| **Embedding Model** | `gemini-embedding-001` | Text → Vector (768 dim) |
 | **LLM** | `gemini-2.0-flash-lite` | Question answering |
 | **Vector DB (Option A)** | PGVector (PostgreSQL) | Production use |
 | **Vector DB (Option B)** | ChromaDB | Local, no Postgres needed ✅ |
-| **ORM** | SQLAlchemy + asyncpg | DB operations |
+| **Caching** | `SimpleTTLCache` (Custom) | Caches semantic queries for 1 hr |
+| **Async Framework** | `asyncio` & `google-genai aio` | Non-blocking API requests |
 
 ---
 
@@ -711,10 +718,12 @@ chunk_overlap=150 → Chunk boundary pe information loss nahi
 
 ---
 
-## 🔍 Semantic Search Flow (Visual)
+## 🔍 Semantic & Hybrid Search Flow (Visual)
 
 ```
 User: "How to setup database connection?"
+          ↓
+    Check Cache: (Miss)
           ↓
     embed_query("How to setup database connection?")
           ↓
@@ -722,14 +731,16 @@ User: "How to setup database connection?"
           ↓
     ChromaDB: cosine similarity with all stored chunks
           ↓
-    Top 5 most similar chunks:
-    - Score: 0.91 → "Database configuration in FastAPI..."
-    - Score: 0.87 → "SQLAlchemy connection setup..."
-    - Score: 0.82 → "Environment variables for DB..."
+    Apply Hybrid Keyword Boost (check chunks for "database", "connection")
           ↓
-    Context + Question → Gemini Flash Lite
+    Top 5 most similar chunks (boosted):
+    - Score: 0.91 (+0.05 boost) → "Database configuration in FastAPI..."
+    - Score: 0.87 (+0.02 boost) → "SQLAlchemy connection setup..."
+    - Score: 0.82 (+0.00 boost) → "Environment variables for DB..."
           ↓
-    "FastAPI mein database setup ke liye..."
+    Context + Question → Gemini Flash Lite (Async)
+          ↓
+    "FastAPI mein database setup ke liye..." (Cached for 1 hour)
 ```
 
 ---
