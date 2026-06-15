@@ -265,17 +265,17 @@ async def answer_question(
     history_block = ""
     if chat_history:
         recent = chat_history[-4:]  # last 2 exchanges max
-        history_block = "\n\nCONVERSATION HISTORY (for follow-up context):\n" + "\n".join(
-            f"{'User' if h['role']=='user' else 'Assistant'}: {h['content']}"
+        history_block = "\n\nPREVIOUS CONVERSATION (Use for context, but do NOT treat as Document text):\n" + "\n".join(
+            f"{'User' if h.get('role')=='user' else 'Assistant'}: {h.get('content')}"
             for h in recent
         ) + "\n"
 
-    user_message = f"""DOCUMENT CONTEXT:
+    user_message = f"""DOCUMENT TEXT TO ANSWER FROM:
 {context}
 {history_block}
-QUESTION: {question}
+CURRENT QUESTION: {question}
 
-Think carefully, then write your answer:"""
+Think carefully, then write your answer using ONLY the DOCUMENT TEXT TO ANSWER FROM:"""
 
     # Step 6 — Generate
     system = _system_prompt(qtype)
